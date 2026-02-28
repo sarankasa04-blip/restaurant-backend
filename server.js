@@ -24,11 +24,13 @@ const Reservation = mongoose.model("Reservation", reservationSchema);
 
 // Setup Gmail Transport
 const transporter = nodemailer.createTransport({
-  service: "gmail",
+  host: "smtp.gmail.com",
+  port: 465,
+  secure: true, // true for 465
   auth: {
     user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_PASS
-  }
+    pass: process.env.GMAIL_PASS,
+  },
 });
 
 app.post("/api/reservations", async (req, res) => {
