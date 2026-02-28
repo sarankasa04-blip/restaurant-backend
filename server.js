@@ -38,24 +38,29 @@ app.post("/api/reservations", async (req, res) => {
     const reservation = new Reservation(req.body);
     await reservation.save();
 
-    // Send confirmation email
-    await transporter.sendMail({
-      from: process.env.GMAIL_USER,
-      to: req.body.email,
-      subject: "Reservation Confirmed",
-      html: `
-        <h2>Reservation Successful!</h2>
-        <p>Name: ${req.body.name}</p>
-        <p>Date: ${req.body.date}</p>
-        <p>Time: ${req.body.time}</p>
-        <p>Guests: ${req.body.guests}</p>
-      `
-    });
+    // Try sending email but don't fail if it breaks
+    try {
+      await transporter.sendMail({
+        from: process.env.GMAIL_USER,
+        to: req.body.email,
+        subject: "Reservation Confirmed",
+        html: `
+          <h2>Reservation Successful</h2>
+          <p>Name: ${req.body.name}</p>
+          <p>Date: ${req.body.date}</p>
+          <p>Time: ${req.body.time}</p>
+          <p>Guests: ${req.body.guests}</p>
+        `
+      });
+    } catch (emailError) {
+      console.log("Email failed:", emailError.message);
+    }
 
+    // Always return success if saved
     res.json({ success: true });
 
   } catch (error) {
-    console.log(error);
+    console.log("Database error:", error.message);
     res.status(500).json({ success: false });
   }
 });
