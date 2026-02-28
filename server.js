@@ -1,67 +1,68 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-require("dotenv").config();
+const nodemailer = require("nodemailer");
 
 const app = express();
-
 app.use(cors());
 app.use(express.json());
 
-// Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log("MongoDB Connected"))
-    .catch(err => console.log(err));
+.then(() => console.log("MongoDB Connected"))
+.catch(err => console.log(err));
 
-// Schema
 const reservationSchema = new mongoose.Schema({
-    name: String,
-    email: String,
-    phone: String,
-    date: String,
-    time: String,
-    guests: Number,
-    createdAt: {
-        type: Date,
-        default: Date.now
-    }
+  name: String,
+  email: String,
+  phone: String,
+  date: String,
+  time: String,
+  guests: String
 });
 
 const Reservation = mongoose.model("Reservation", reservationSchema);
 
-// Create reservation
-app.post('/api/reservations', async (req, res) => {
-    try {
-        const reservation = new Reservation(req.body);
-        await reservation.save();
-        res.status(201).json({ success: true, data: reservation });
-    } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
-    }
+// Setup Gmail Transport
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_PASS
+  }
 });
 
-// Get all reservations
-app.get('/api/reservations', async (req, res) => {
-    try {
-        const reservations = await Reservation.find().sort({ createdAt: -1 });
-        res.json(reservations);
-    } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
-    }
+app.post("/api/reservations", async (req, res) => {
+  try {
+    const reservation = new Reservation(req.body);
+    await reservation.save();
+
+    // Send confirmation email
+    await transporter.sendMail({
+      from: process.env.GMAIL_USER,
+      to: req.body.email,
+      subject: "Reservation Confirmed",
+      html: `
+        <h2>Reservation Successful!</h2>
+        <p>Name: ${req.body.name}</p>
+        <p>Date: ${req.body.date}</p>
+        <p>Time: ${req.body.time}</p>
+        <p>Guests: ${req.body.guests}</p>
+      `
+    });
+
+    res.json({ success: true });
+
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ success: false });
+  }
 });
 
-// Delete reservation
-app.delete('/api/reservations/:id', async (req, res) => {
-    try {
-        await Reservation.findByIdAndDelete(req.params.id);
-        res.json({ success: true });
-    } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
-    }
+app.get("/api/reservations", async (req, res) => {
+  const reservations = await Reservation.find().sort({ _id: -1 });
+  res.json(reservations);
 });
 
-const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
+app.listen(process.env.PORT || 5000, () =>
+  console.log("Server Running")
+);
